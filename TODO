@@ -3,3 +3,4 @@ TODO
 
     * Add management commands for creating initial revisions, deleting revisions.
     * Add a comprehensive suite of tests for development.
+    * Add document revision support for dict fields.
