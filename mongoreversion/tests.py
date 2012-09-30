@@ -41,35 +41,71 @@ def create_sample_revisioned_document():
     doc = SampleDocument(slug='sample-doc-slug', title='Sample Document Title', tag_strings=['one', 'two', 'three', ], tag_models=tag_models)
     return doc
 
+def save_revision_and_check(test, user, doc, comment=None, is_diff=True):
+    revision, is_new = Revision.save_revision(user, doc, comment)
+    test.assertEqual(is_new, is_diff)
+    test.assertTrue(revision)
+    test.assertTrue(revision.pk)
+    test.assertTrue(revision.timestamp)
+    test.assertTrue(revision.instance_type)
+    test.assertEqual(revision.instance_type.class_name, doc._class_name)
+    test.assertTrue(revision.instance_data)
+    for key, value in revision.instance_data.items():
+        if key in revision.related_field_types:
+            field_model = revision.related_field_types.get(key)
+            value = [field_model.objects.get(pk=v) for v in value]
+        test.assertEqual(value, getattr(doc, key, None))
+    return revision
+
 class RevisionModelTest(MongoTestCase):
-    """
-        Test the Revision document model.
 
-        TODO: Add a comprehensive suite of tests for development.
-    """
-
-    def test_create_revision(self):
+    def test_create_revision_initial(self):
+        """
+            Test creating a document initial revision
+        """
         user = create_and_save_sample_user()
         doc = create_sample_revisioned_document()
         for tag in doc.tag_models:
-            Revision.create_revision(user, tag)
-        comment = 'sample comment...'
-        revision = Revision.create_revision(user, doc, comment)
-        self.assertTrue(revision)
-        self.assertTrue(revision.pk)
-        self.assertTrue(revision.timestamp)
-        self.assertTrue(revision.instance_type)
-        self.assertEqual(revision.instance_type.class_name, doc._class_name)
-        self.assertTrue(revision.instance_data)
-        for key, value in revision.instance_data.items():
-            if key in revision.related_field_types:
-                field_model = revision.related_field_types.get(key)
-                value = [field_model.objects.get(pk=v) for v in value]
-            self.assertEqual(value, getattr(doc, key, None))
+            save_revision_and_check(self, user, tag)
+        save_revision_and_check(self, user, doc, 'sample comment...')
+
+    def test_create_revision_with_no_diff(self):
+        """
+            Test creating a revision with a document that has no changes from 
+            the previous revision.
+        """
+        user = create_and_save_sample_user()
+        doc = create_sample_revisioned_document()
+        for tag in doc.tag_models:
+            save_revision_and_check(self, user, tag)
+        save_revision_and_check(self, user, doc, 'sample comment...')
+        save_revision_and_check(self, user, doc, 'sample comment...', is_diff=False)
+
+    def test_create_revision_with_diff(self):
+        """
+            Test creating a revision with a document that has no changes from 
+            the previous revision.
+        """
+        user = create_and_save_sample_user()
+        doc = create_sample_revisioned_document()
+        for tag in doc.tag_models:
+            save_revision_and_check(self, user, tag)
+        save_revision_and_check(self, user, doc, 'sample comment...')
+        doc.title = 'New Sample Title'
+        save_revision_and_check(self, user, doc, 'another sample comment...')
 
     def test_revert_revision(self):
-        pass
-        # TODO: implement this...
+        """
+            Test reverting a document back to a specific revision.
+        """
+        user = create_and_save_sample_user()
+        doc = create_sample_revisioned_document()
+        for tag in doc.tag_models:
+            save_revision_and_check(self, user, tag)
+        save_revision_and_check(self, user, doc, 'sample comment...')
+        doc.title = 'New Sample Title'
+        save_revision_and_check(self, user, doc, 'another sample comment...')
+        # TODO: implement revert and test it here...
 
 
 

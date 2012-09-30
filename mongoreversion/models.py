@@ -59,6 +59,22 @@ class Revision(Document):
         except User.DoesNotExist:
             return None
 
+    def diff(self, revision=None):
+        """
+            Returns the diff of the current revision with the given revision.
+            If the given revision is empty, use the latest revision of the 
+            document instance.
+        """
+        if not revision:
+            revision = Revision.latest_revision(self.instance)
+        if not revision:
+            return self.instance_data
+        diff_dict = {}
+        for key, value in self.instance_data.items():
+            if value != revision.instance_data.get(key):
+                diff_dict[key] = value
+        return diff_dict
+
     @staticmethod
     def latest_revision(instance):
         try:
@@ -71,16 +87,13 @@ class Revision(Document):
         return None
 
     @staticmethod
-    def create_revision(user, instance, comment=None):
+    def save_revision(user, instance, comment=None):
         if not instance._meta.get('versioned', None):
             raise ValueError('instance meta does not specify it to be versioned, set versioned=True to enable')
 
         instance_type, is_new = ContentType.objects.get_or_create(class_name=instance._class_name)
         instance_data = dict(instance._data)
         instance_related_revisions = {}
-
-        # TODO: check for any differences in data from last revision
-        # if none then raise error or return last revision
 
         # ensure instance has been saved at least once
         if not instance.pk:
@@ -150,6 +163,19 @@ class Revision(Document):
                 # store data as is
                 instance_data[key] = value
 
-        return Revision.objects.create(user_id=user.pk, timestamp=datetime.now(), instance_type=instance_type, instance_data=instance_data, instance_related_revisions=instance_related_revisions, instance_id=instance.pk, comment=comment)
+        # create the revision, but do not save it yet
+        revision = Revision(user_id=user.pk, timestamp=datetime.now(), instance_type=instance_type, instance_data=instance_data, instance_related_revisions=instance_related_revisions, instance_id=instance.pk, comment=comment)
+
+        # check for any differences in data from lastest revision
+        # return the latest revision if no difference
+        latest_revision = Revision.latest_revision(instance)
+        if latest_revision:
+            diff = revision.diff(latest_revision)
+            if not diff:
+                return latest_revision, False
+
+        # save revision and return
+        revision.save()
+        return revision, True
 
 
