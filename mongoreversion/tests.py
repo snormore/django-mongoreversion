@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from mongoreversion.models import Revision
-from mongoreversion.testcases import MongoTestCase
+from mongotesting import MongoTestCase
 from mongoengine.document import Document
 from mongoengine.fields import DictField, StringField, ReferenceField, IntField, DateTimeField, ListField
 from django.template.defaultfilters import slugify
