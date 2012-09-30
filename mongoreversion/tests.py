@@ -102,10 +102,13 @@ class RevisionModelTest(MongoTestCase):
         doc = create_sample_revisioned_document()
         for tag in doc.tag_models:
             save_revision_and_check(self, user, tag)
-        save_revision_and_check(self, user, doc, 'sample comment...')
+        rev1 = save_revision_and_check(self, user, doc, 'sample comment...')
+        doc1_id = doc.pk
         doc.title = 'New Sample Title'
-        save_revision_and_check(self, user, doc, 'another sample comment...')
-        # TODO: implement revert and test it here...
-
+        rev2 = save_revision_and_check(self, user, doc, 'another sample comment...')
+        doc1 = rev1.revert()
+        doc1 = SampleDocument.objects.get(pk=doc1_id)
+        self.assertNotEqual(doc1.title, rev2.instance.title)
+        self.assertEqual(doc1.title, rev1.instance.title)
 
 

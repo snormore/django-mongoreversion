@@ -29,7 +29,8 @@ class Revision(Document):
         
         # create lookup of related field types
         related_field_types = {}
-        for key, field in self.instance._fields.items():
+        instance_model = self.instance_type.document_model()
+        for key, field in instance_model._fields.items():
             related_field_type = None
             if isinstance(field, ListField):
                 if isinstance(field.field, ReferenceField):
@@ -47,10 +48,33 @@ class Revision(Document):
     @property
     def instance(self):
         instance_model = self.instance_type.document_model()
-        try:
-            return instance_model.objects.get(pk=self.instance_id)
-        except instance_model.DoesNotExist:
-            return None
+        data = dict(self.instance_data)
+        for key, value in data.items():
+            if key in self.related_field_types:
+                if key in self.instance_related_revisions:
+                    revision_value = self.instance_related_revisions.get(key)
+                    if isinstance(revision_value, (list, tuple)):
+                        values = []
+                        for i, rev_id in enumerate(revision_value):
+                            if rev_id:
+                                revision = Revision.objects.get(pk=rev_id)
+                                values.append(revision.instance)
+                            else:
+                                obj_id = value[i]
+                                values.append(self.related_field_types.get(key).objects.get(pk=obj_id))
+                        data[key] = values
+                    else:
+                        if value:
+                            revision = Revision.objects.get(pk=value)
+                            data[key] = revision.instance
+                        else:
+                            data[key] = self.related_field_types.get(key).objects.get(pk=value)
+                else:
+                    if isinstance(value, (list, tuple)):
+                        data[key] = [self.related_field_types.get(key).objects.get(pk=v) for v in value]
+                    else:
+                        data[key] = self.related_field_types.get(key).objects.get(pk=value)
+        return instance_model(**data)
 
     @property
     def user(self):
@@ -74,6 +98,14 @@ class Revision(Document):
             if value != revision.instance_data.get(key):
                 diff_dict[key] = value
         return diff_dict
+
+    def revert(self):
+        """
+            Revert the associated document instance back to this revision.
+            Return the document instance.
+        """
+        self.instance.save()
+        return self.instance
 
     @staticmethod
     def latest_revision(instance):
