@@ -10,4 +10,12 @@ Requirements
 
     * Django 1.2+
     * MongoEngine
-    # MongoTestRunner and MongoTestCase requires the `nose` package
+    * MongoTestRunner and MongoTestCase requires the `nose` package
+
+References
+============================
+
+    * http://mongoengine.org - https://github.com/hmarr/mongoengine
+    * http://stackoverflow.com/questions/4185105/ways-to-implement-data-versioning-in-mongodb
+    * https://github.com/etianen/django-reversion
+    * http://stackoverflow.com/questions/3507624/mongodb-nosql-keeping-document-change-history
