@@ -13,4 +13,9 @@ setup(
     packages=[
         'mongoreversion',
     ],
+    install_requires=[
+        'django', 
+        'mongoengine', 
+        'nose', 
+    ],
 )
