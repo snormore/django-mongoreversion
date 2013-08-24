@@ -196,11 +196,12 @@ class Revision(Document):
                 instance_data[key] = value
 
         # create the revision, but do not save it yet
-        revision = Revision(user_id=user.pk, timestamp=datetime.now(), instance_type=instance_type, instance_data=instance_data, instance_related_revisions=instance_related_revisions, instance_id=instance.pk, comment=comment)
+        model_class = MongoUserRevision if issubclass(user.__class__, Document) else Revision
+        revision = model_class(user_id=user.pk, timestamp=datetime.now(), instance_type=instance_type, instance_data=instance_data, instance_related_revisions=instance_related_revisions, instance_id=instance.pk, comment=comment)
 
         # check for any differences in data from lastest revision
         # return the latest revision if no difference
-        latest_revision = Revision.latest_revision(instance)
+        latest_revision = model_class.latest_revision(instance)
         if latest_revision:
             diff = revision.diff(latest_revision)
             if not diff:
@@ -210,4 +211,6 @@ class Revision(Document):
         revision.save()
         return revision, True
 
+class MongoUserRevision(Revision):
+    user_id = ObjectIdField(required=True)
 

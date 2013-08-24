@@ -5,10 +5,19 @@ from mongoengine.document import Document
 from mongoengine.fields import DictField, StringField, ReferenceField, IntField, DateTimeField, ListField
 from django.template.defaultfilters import slugify
 
+class MongoUser(Document):
+    username = StringField(max_length=255)
+    email = StringField(max_length=255)
+
 def create_and_save_sample_user(suffix=''):
     username = 'user%s' % (suffix, )
     email = '%s@example.com' % (username, )
     return User.objects.create(username=username, email=email)
+
+def create_and_save_sample_mongo_user(suffix=''):
+    username = 'user%s' % (suffix, )
+    email = '%s@example.com' % (username, )
+    return MongoUser.objects.create(username=username, email=email)
 
 class SampleTag(Document):
     slug = StringField(max_length=100)
@@ -69,6 +78,16 @@ class RevisionModelTest(MongoTestCase):
             save_revision_and_check(self, user, tag)
         save_revision_and_check(self, user, doc, 'sample comment...')
 
+    def test_create_revision_initial_with_mongouser(self):
+        """
+            Test creating a document initial revision with a mongo user as author
+        """
+        user = create_and_save_sample_mongo_user()
+        doc = create_sample_revisioned_document()
+        for tag in doc.tag_models:
+            save_revision_and_check(self, user, tag)
+        save_revision_and_check(self, user, doc, 'sample comment...')
+
     def test_create_revision_with_no_diff(self):
         """
             Test creating a revision with a document that has no changes from 
@@ -94,11 +113,54 @@ class RevisionModelTest(MongoTestCase):
         doc.title = 'New Sample Title'
         save_revision_and_check(self, user, doc, 'another sample comment...')
 
+    def test_create_mongouser_revision_with_diff(self):
+        """
+            Test creating a revision with a document that has no changes from 
+            the previous revision.
+        """
+        user = create_and_save_sample_mongo_user()
+        doc = create_sample_revisioned_document()
+        for tag in doc.tag_models:
+            save_revision_and_check(self, user, tag)
+        save_revision_and_check(self, user, doc, 'sample comment...')
+        doc.title = 'New Sample Title'
+        save_revision_and_check(self, user, doc, 'another sample comment...')
+
+    def test_create_mongouser_revision_with_diff(self):
+        """
+            Test creating a revision with a document that has no changes from 
+            the previous revision.
+        """
+        user = create_and_save_sample_mongo_user()
+        doc = create_sample_revisioned_document()
+        for tag in doc.tag_models:
+            save_revision_and_check(self, user, tag)
+        save_revision_and_check(self, user, doc, 'sample comment...')
+        doc.title = 'New Sample Title'
+        save_revision_and_check(self, user, doc, 'another sample comment...')
+
     def test_revert_revision(self):
         """
             Test reverting a document back to a specific revision.
         """
         user = create_and_save_sample_user()
+        doc = create_sample_revisioned_document()
+        for tag in doc.tag_models:
+            save_revision_and_check(self, user, tag)
+        rev1 = save_revision_and_check(self, user, doc, 'sample comment...')
+        doc1_id = doc.pk
+        doc.title = 'New Sample Title'
+        rev2 = save_revision_and_check(self, user, doc, 'another sample comment...')
+        doc1 = rev1.revert()
+        doc1 = SampleDocument.objects.get(pk=doc1_id)
+        self.assertNotEqual(doc1.title, rev2.instance.title)
+        self.assertEqual(doc1.title, rev1.instance.title)
+
+    def test_revert_mongouser_revision(self):
+        """
+            Test reverting a document back to a specific revision.
+        """
+        user = create_and_save_sample_mongo_user()
         doc = create_sample_revisioned_document()
         for tag in doc.tag_models:
             save_revision_and_check(self, user, tag)
