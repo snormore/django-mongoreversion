@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from mongoreversion.models import Revision
+from mongoreversion.models import Revision, ReversionedDocument, ContentType
 from mongotesting import MongoTestCase
 from mongoengine.document import Document
 from mongoengine.fields import DictField, StringField, ReferenceField, IntField, DateTimeField, ListField
@@ -41,6 +41,18 @@ class SampleDocument(Document):
         'versioned_related': ['tag_models', ], 
     }
 
+class SampleReversionedDocument(ReversionedDocument):
+    slug = StringField(max_length=100)
+    title = StringField(max_length=100)
+    tag_strings = ListField(StringField())
+    tag_models = ListField(ReferenceField(SampleTag, dbref=False))
+
+    meta = {
+        'versioned': True, 
+        'versioned_fields': ['title', 'slug', ], 
+        'versioned_related': ['tag_models', ], 
+    }
+
 def create_sample_revisioned_document():
     tag_models = []
     for i in range(3):
@@ -48,6 +60,15 @@ def create_sample_revisioned_document():
         tag = SampleTag(slug=slugify(title), title=title)
         tag_models.append(tag)
     doc = SampleDocument(slug='sample-doc-slug', title='Sample Document Title', tag_strings=['one', 'two', 'three', ], tag_models=tag_models)
+    return doc
+
+def create_sample_reversioned_document():
+    tag_models = []
+    for i in range(3):
+        title = 'Sample Tag %s' % (i, )
+        tag = SampleTag(slug=slugify(title), title=title)
+        tag_models.append(tag)
+    doc = SampleReversionedDocument(slug='sample-doc-slug', title='Sample Document Title', tag_strings=['one', 'two', 'three', ], tag_models=tag_models)
     return doc
 
 def save_revision_and_check(test, user, doc, comment=None, is_diff=True):
@@ -84,6 +105,26 @@ class RevisionModelTest(MongoTestCase):
         """
         user = create_and_save_sample_mongo_user()
         doc = create_sample_revisioned_document()
+        for tag in doc.tag_models:
+            save_revision_and_check(self, user, tag)
+        save_revision_and_check(self, user, doc, 'sample comment...')
+
+    def test_create_reversioned_document_initial(self):
+        """
+            Test creating a document initial revision
+        """
+        user = create_and_save_sample_user()
+        doc = create_sample_reversioned_document()
+        for tag in doc.tag_models:
+            save_revision_and_check(self, user, tag)
+        save_revision_and_check(self, user, doc, 'sample comment...')
+
+    def test_create_reversioned_document_initial_with_mongouser(self):
+        """
+            Test creating a document initial revision with a mongo user as author
+        """
+        user = create_and_save_sample_mongo_user()
+        doc = create_sample_reversioned_document()
         for tag in doc.tag_models:
             save_revision_and_check(self, user, tag)
         save_revision_and_check(self, user, doc, 'sample comment...')
@@ -172,5 +213,29 @@ class RevisionModelTest(MongoTestCase):
         doc1 = SampleDocument.objects.get(pk=doc1_id)
         self.assertNotEqual(doc1.title, rev2.instance.title)
         self.assertEqual(doc1.title, rev1.instance.title)
+
+class ReversionedDocumentTest(MongoTestCase):
+
+    def test_is_versioned(self):
+        doc = create_sample_reversioned_document()
+        doc._meta['versioned'] = True
+        self.assertEqual(True, doc.is_versioned)
+        doc._meta['versioned'] = False
+        self.assertEqual(False, doc.is_versioned)
+        doc._meta['versioned'] = True
+
+    def test_revisions(self):
+        user = create_and_save_sample_user()
+        doc = create_sample_reversioned_document()
+        for tag in doc.tag_models:
+            tag.save()
+        doc.save()
+        ContentType.objects.create(class_name=doc._class_name)
+
+        self.assertEqual(0, doc.revisions.count())
+        doc.slug = 'new-sample-slug'
+        save_revision_and_check(self, user, doc, 'sample comment...')
+        self.assertEqual(1, doc.revisions.count())
+
 
 

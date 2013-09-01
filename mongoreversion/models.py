@@ -6,6 +6,28 @@ from django.contrib.contenttypes.models import ContentType as DjangoContentType
 from datetime import datetime
 from mongoengine.base import _document_registry
 
+class ReversionedDocument(Document):
+    """
+    A Document based class to be inherited from by a Document that is to be revisable.
+
+    It's not necessary to inherit from this class, it is for convenience only, versioned
+    configuration happens in the meta dict, see tests.py for examples.
+    """
+    meta = { 'abstract': True }
+
+    @property
+    def is_versioned(self):
+        return self._meta.get("versioned", None)
+
+    @property
+    def revisions_count(self):        
+        return self.revisions.count()
+
+    @property
+    def revisions(self):
+        instance_type = ContentType.objects.get(class_name=self._class_name)
+        return Revision.objects.filter(instance_type=instance_type, instance_id=self.pk).order_by('-timestamp') 
+
 class ContentType(Document):
     class_name = StringField(max_length=100, unique=True)
 
