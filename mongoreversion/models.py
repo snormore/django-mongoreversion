@@ -16,7 +16,7 @@ class ContentType(Document):
         return _document_registry.get(self.class_name, None)
 
 class Revision(Document):
-    user_id = IntField(required=True)
+    user_id = StringField(required=True)
     timestamp = DateTimeField(default=datetime.now, required=True)
     instance_data = DictField()
     instance_related_revisions = DictField()
@@ -82,6 +82,7 @@ class Revision(Document):
             return User.objects.get(pk=self.user_id)
         except User.DoesNotExist:
             return None
+
 
     def diff(self, revision=None):
         """
@@ -196,7 +197,7 @@ class Revision(Document):
                 instance_data[key] = value
 
         # create the revision, but do not save it yet
-        revision = Revision(user_id=user.pk, timestamp=datetime.now(), instance_type=instance_type, instance_data=instance_data, instance_related_revisions=instance_related_revisions, instance_id=instance.pk, comment=comment)
+        revision = Revision(user_id=str(user.pk), timestamp=datetime.now(), instance_type=instance_type, instance_data=instance_data, instance_related_revisions=instance_related_revisions, instance_id=instance.pk, comment=comment)
 
         # check for any differences in data from lastest revision
         # return the latest revision if no difference
@@ -209,5 +210,3 @@ class Revision(Document):
         # save revision and return
         revision.save()
         return revision, True
-
-
