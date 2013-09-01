@@ -43,7 +43,7 @@ class Revision(Document):
 
 
     def __unicode__(self):
-        return '<Revision time=%s, type=%s, comment=%s, >' % (self.timestamp, self.instance_type, self.comment, )
+        return '<Revision user=%s, time=%s, type=%s, comment=%s, >' % (self.user_id, self.timestamp, self.instance_type, self.comment, )
 
     @property
     def instance(self):
@@ -75,6 +75,14 @@ class Revision(Document):
                     else:
                         data[key] = self.related_field_types.get(key).objects.get(pk=value)
         return instance_model(**data)
+
+    @property
+    def user(self):
+        try:
+            return User.objects.get(pk=self.user_id)
+        except User.DoesNotExist:
+            return None
+
 
     def diff(self, revision=None):
         """
