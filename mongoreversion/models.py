@@ -16,7 +16,7 @@ class ContentType(Document):
         return _document_registry.get(self.class_name, None)
 
 class Revision(Document):
-    user_id = IntField(required=True)
+    user_id = StringField(required=True)
     timestamp = DateTimeField(default=datetime.now, required=True)
     instance_data = DictField()
     instance_related_revisions = DictField()
@@ -43,7 +43,7 @@ class Revision(Document):
 
 
     def __unicode__(self):
-        return '<Revision user=%s, time=%s, type=%s, comment=%s, >' % (self.user_id, self.timestamp, self.instance_type, self.comment, )
+        return '<Revision time=%s, type=%s, comment=%s, >' % (self.timestamp, self.instance_type, self.comment, )
 
     @property
     def instance(self):
@@ -75,13 +75,6 @@ class Revision(Document):
                     else:
                         data[key] = self.related_field_types.get(key).objects.get(pk=value)
         return instance_model(**data)
-
-    @property
-    def user(self):
-        try:
-            return User.objects.get(pk=self.user_id)
-        except User.DoesNotExist:
-            return None
 
     def diff(self, revision=None):
         """
@@ -196,12 +189,11 @@ class Revision(Document):
                 instance_data[key] = value
 
         # create the revision, but do not save it yet
-        model_class = MongoUserRevision if issubclass(user.__class__, Document) else Revision
-        revision = model_class(user_id=user.pk, timestamp=datetime.now(), instance_type=instance_type, instance_data=instance_data, instance_related_revisions=instance_related_revisions, instance_id=instance.pk, comment=comment)
+        revision = Revision(user_id=str(user.pk), timestamp=datetime.now(), instance_type=instance_type, instance_data=instance_data, instance_related_revisions=instance_related_revisions, instance_id=instance.pk, comment=comment)
 
         # check for any differences in data from lastest revision
         # return the latest revision if no difference
-        latest_revision = model_class.latest_revision(instance)
+        latest_revision = Revision.latest_revision(instance)
         if latest_revision:
             diff = revision.diff(latest_revision)
             if not diff:
@@ -210,7 +202,3 @@ class Revision(Document):
         # save revision and return
         revision.save()
         return revision, True
-
-class MongoUserRevision(Revision):
-    user_id = ObjectIdField(required=True)
-
