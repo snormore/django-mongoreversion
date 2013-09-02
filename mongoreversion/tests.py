@@ -71,8 +71,18 @@ def create_sample_reversioned_document():
     doc = SampleReversionedDocument(slug='sample-doc-slug', title='Sample Document Title', tag_strings=['one', 'two', 'three', ], tag_models=tag_models)
     return doc
 
-def save_revision_and_check(test, user, doc, comment=None, is_diff=True):
-    revision, is_new = Revision.save_revision(user, doc, comment)
+def create_sample_reversioned_document(create_revision_after_save=False):
+    tag_models = []
+    for i in range(3):
+        title = 'Sample Tag %s' % (i, )
+        tag = SampleTag(slug=slugify(title), title=title)
+        tag_models.append(tag)
+    doc = SampleReversionedDocument(slug='sample-doc-slug', title='Sample Document Title', tag_strings=['one', 'two', 'three', ], tag_models=tag_models)
+    doc._meta['create_revision_after_save'] = create_revision_after_save
+    return doc
+
+def save_revision_and_check(test, user, doc, comment=None, is_diff=True, instance_save_revision=False):
+    revision, is_new = doc.save_revision(user, comment) if instance_save_revision else Revision.save_revision(user, doc, comment) 
     test.assertEqual(is_new, is_diff)
     test.assertTrue(revision)
     test.assertTrue(revision.pk)
@@ -230,12 +240,34 @@ class ReversionedDocumentTest(MongoTestCase):
         for tag in doc.tag_models:
             tag.save()
         doc.save()
-        ContentType.objects.create(class_name=doc._class_name)
+        ContentType.objects.get_or_create(class_name=doc._class_name)
 
         self.assertEqual(0, doc.revisions.count())
         doc.slug = 'new-sample-slug'
         save_revision_and_check(self, user, doc, 'sample comment...')
         self.assertEqual(1, doc.revisions.count())
 
+    def test_save_revision(self):
+        user = create_and_save_sample_user()
+        doc = create_sample_reversioned_document()
+        for tag in doc.tag_models:
+            tag.save()
+        doc.save()
+        ContentType.objects.get_or_create(class_name=doc._class_name)
 
+        self.assertEqual(0, doc.revisions.count())
+        doc.slug = 'new-sample-slug'
+        save_revision_and_check(self, user, doc, 'sample comment...', instance_save_revision=True)
+        self.assertEqual(1, doc.revisions.count())
 
+    def test_create_revision_after_save(self):
+        user = create_and_save_sample_user()
+        doc = create_sample_reversioned_document(create_revision_after_save=True)
+        for tag in doc.tag_models:
+            tag.save()
+        doc.save(user=user)
+
+        self.assertEqual(1, doc.revisions.count())
+        doc.slug = 'new-sample-slug'
+        doc.save(user=user)
+        self.assertEqual(2, doc.revisions.count())

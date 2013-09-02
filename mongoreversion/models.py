@@ -26,7 +26,19 @@ class ReversionedDocument(Document):
     @property
     def revisions(self):
         instance_type = ContentType.objects.get(class_name=self._class_name)
-        return Revision.objects.filter(instance_type=instance_type, instance_id=self.pk).order_by('-timestamp') 
+        return Revision.objects.filter(instance_type=instance_type, instance_id=self.pk).order_by('-timestamp')
+
+    def save_revision(self, user, comment=''):
+        return Revision.save_revision(user, self, comment)
+
+    def save(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        r = super(ReversionedDocument, self).save(*args, **kwargs)
+        if self._meta.get('create_revision_after_save', False):
+            if not user:
+                raise ValueError('user must be passed to instance save when create_revision_after_save=True')
+            self.save_revision(user, kwargs.get('revision_comment', ''))
+        return r
 
 class ContentType(Document):
     class_name = StringField(max_length=100, unique=True)
